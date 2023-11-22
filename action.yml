@@ -1,0 +1,52 @@
+name: 'Quill Composite Action'
+description: 'Main quill action'
+# Define your inputs here.
+inputs:
+  build-platform:
+    description: "Which build platform to use. Options are: 'flutter'"
+    required: true
+    default: 'flutter'
+
+# Define your outputs here.
+outputs:
+  emulator-link:
+    description: 'A link to the emulator running the built mobile app'
+    value: ${{ steps.generate-emulator-link.outputs.random-number }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-java@v2
+      with:
+        distribution: 'zulu'
+        java-version: '11'
+    - name: Build android flutter application
+      uses: subosito/flutter-action@v2
+      with:
+        cache: true
+        cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
+        cache-path: "${{ runner.tool_cache }}/flutter/:channel:-:version:-:arch:"
+    # - run: flutter analyze
+    # - run: flutter test
+    - run: flutter build apk --release
+      shell: bash
+    - run: sudo apt-get update
+      shell: bash
+    - run: sudo apt-get -y install aapt
+      shell: bash
+    - name: Get Android Package Name
+      id: get_package_name
+      run: |
+        sudo aapt dump badging build/app/outputs/flutter-apk/*.apk > package_info.txt
+        package_name=$(sed -nE "s/^package: name='([^']+)'.*/\1/p" package_info.txt)
+        echo "PACKAGE_NAME=$package_name" >> GITHUB_ENV
+        echo "Package Name -> ${package_name}"
+      shell: bash
+    - uses: actions/upload-artifact@v3
+      with:
+        name: "android-apk-${{ github.sha }}"
+        path: "build/app/outputs/flutter-apk/*.apk"
+    - id: generate-emulator-link
+      run: echo "EMULATOR_LINK=https://example.com" >> $GITHUB_OUTPUT
+      shell: bash
