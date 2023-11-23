@@ -40,13 +40,89 @@ runs:
       run: |
         sudo aapt dump badging build/app/outputs/flutter-apk/*.apk > package_info.txt
         package_name=$(sed -nE "s/^package: name='([^']+)'.*/\1/p" package_info.txt)
-        echo "PACKAGE_NAME=$package_name" >> GITHUB_ENV
-        echo "Package Name -> ${package_name}"
+        echo "PACKAGE_NAME=$package_name" >> $GITHUB_ENV
+        echo "Package Name -> $package_name"
       shell: bash
     - uses: actions/upload-artifact@v3
       with:
         name: "android-apk-${{ github.sha }}"
         path: "build/app/outputs/flutter-apk/*.apk"
+    - name: Get Artifact URL
+      id: get-artifact-url
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        run_id=$(echo "$GITHUB_RUN_ID")
+        repo_owner=$(echo "$GITHUB_REPOSITORY" | cut -d '/' -f1)
+        repo_name=$(echo "$GITHUB_REPOSITORY" | cut -d '/' -f2)
+
+        # Use GitHub API to get artifact information
+        artifact_info=$(gh api "/repos/$repo_owner/$repo_name/actions/runs/$run_id/artifacts")
+
+        # Extract the URL or download URL for your specific artifact
+        # ... process $artifact_info to retrieve the artifact URL or download URL
+
+        # Set the artifact URL as an output
+        # echo "::set-output name=artifact-url::$artifact_url"
+        echo "Run ID: $run_id"
+        echo "RUN_ID=$run_id" >> $GITHUB_ENV
+        echo "repo_owner: $repo_owner"
+        echo "repo_name: $repo_name"
+        echo "Artifact info: $artifact_info"
+      shell: bash
+    - name: Check if Event is a Pull Request
+      if: github.event_name != 'pull_request'
+      run: |
+        echo "Workflow not triggered by a Pull Request. Exiting..."
+        exit 0  # Exit the workflow if it's not a pull request event
+      shell: bash
+    - name: Get PR Details
+      id: pr-details
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        # Get the pull request event payload
+        pr_event_path=$(echo "$GITHUB_EVENT_PATH")
+
+        # Extract and display pull request details
+        pr_number=$(jq -r '.pull_request.number' "$pr_event_path")
+        pr_title=$(jq -r '.pull_request.title' "$pr_event_path")
+        pr_url=$(jq -r '.pull_request.html_url' "$pr_event_path")
+
+        echo "PR number: $pr_number"
+        echo "PR URL: $pr_url"
+        echo "PR Title: $pr_title"
+        echo "RUN_ID: $RUN_ID"
+        echo "PACKAGE_NAME: $PACKAGE_NAME"
+        echo "PR_NUMBER=$pr_number" >> $GITHUB_ENV
+        echo "PR_URL=$pr_url" >> $GITHUB_ENV
+        echo "PR_TITLE=$pr_title" >> $GITHUB_ENV
+      shell: bash
+    - uses: thollander/actions-comment-pull-request@v2
+      env:
+        RUNS_PATH: "${{ github.server_url }}/${{ github.repository }}/actions/\
+          runs/${{ env.RUN_ID }}"
+        ARTIFACT_URL: "https://api.github.com/repos/${{ github.repository_owner }}/${{ github.event.repository.name }}/actions/runs/${{ env.RUN_ID }}"
+        PR_LINK: "[#${{ env.PR_NUMBER }} ${{ env.PR_TITLE }}](${{ env.PR_URL }})"
+      with:
+        # https://docs.github.com/en/rest/actions/artifacts?apiVersion=2022-11-28
+        message: |-
+          ## Build Details
+
+          [![badge]](${{ env.RUNS_PATH }})
+
+          Here is a link to the emulator to view your mobile application.
+
+          Please note that files only stay for around 90 days.
+
+          | Name         | Link |
+          |--------------|------|
+          | Pull Request | ${{ env.PR_LINK }} |
+          | Artifacts and Logs | ${{ env.RUNS_PATH }} |
+          | Emulator | http://localhost:3000/?url=${{ env.ARTIFACT_URL }}&pkg=${{ env.PACKAGE_NAME }} |
+
+          [badge]: https://img.shields.io/badge/Build-Success!-3fb950?logo=github&style=for-the-badge
+
     - id: generate-emulator-link
       run: echo "EMULATOR_LINK=https://example.com" >> $GITHUB_OUTPUT
       shell: bash
