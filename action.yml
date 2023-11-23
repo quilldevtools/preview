@@ -6,6 +6,9 @@ inputs:
     description: "Which build platform to use. Options are: 'flutter'"
     required: true
     default: 'flutter'
+  gdrive-sa-key:
+    description: "Google Drive Service Account Key"
+    required: true
 
 # Define your outputs here.
 outputs:
@@ -17,36 +20,78 @@ runs:
   using: composite
   steps:
     - uses: actions/checkout@v3
-    - uses: actions/setup-java@v2
-      with:
-        distribution: 'zulu'
-        java-version: '11'
-    - name: Build android flutter application
-      uses: subosito/flutter-action@v2
-      with:
-        cache: true
-        cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
-        cache-path: "${{ runner.tool_cache }}/flutter/:channel:-:version:-:arch:"
+    # - uses: actions/setup-java@v2
+    #   with:
+    #     distribution: 'zulu'
+    #     java-version: '11'
+    # - name: Build android flutter application
+    #   uses: subosito/flutter-action@v2
+    #   with:
+    #     cache: true
+    #     cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
+    #     cache-path: "${{ runner.tool_cache }}/flutter/:channel:-:version:-:arch:"
     # - run: flutter analyze
     # - run: flutter test
-    - run: flutter build apk --release
+    # - run: flutter build apk --release
+    #   shell: bash
+    # - run: sudo apt-get update
+    #   shell: bash
+    # - run: sudo apt-get -y install aapt
+    #   shell: bash
+    # - name: Get Android Package Name
+    #   id: get_package_name
+    #   run: |
+    #     sudo aapt dump badging build/app/outputs/flutter-apk/*.apk > package_info.txt
+    #     package_name=$(sed -nE "s/^package: name='([^']+)'.*/\1/p" package_info.txt)
+    #     echo "PACKAGE_NAME=$package_name" >> $GITHUB_ENV
+    #     echo "Package Name -> $package_name"
+    #   shell: bash
+    # - name: Make Directory Structure
+    #   run: |
+    #     apk_directory="{{ github.repository_owner }}/${{ github.event.repository.name }}/runs/${{ env.RUN_ID }}"
+
+    #     echo "APK_DIRECTORY="$apk_directory" >> $GITHUB_ENV
+    #     mkdir -p "$apk_directory"
+    #     date +%s > "$apk_directory"
+
+    #   shell: bash
+    # - name: Mirror Directory Structure
+    #   uses: adityak74/google-drive-upload-git-action@main
+    #   with:
+    #     credentials: ${{ secrets.GDRIVE_SA_KEY }}
+    #     filename: "build/app/outputs/flutter-apk/*.apk"
+    #     folderId: ${{ secrets.GDRIVE_FOLDER_ID }}
+    #     overwrite: "true"
+    #     mirrorDirectoryStructure: "true"
+    - name: Set up environment variables
+      run: .envsetup.sh
       shell: bash
-    - run: sudo apt-get update
-      shell: bash
-    - run: sudo apt-get -y install aapt
-      shell: bash
-    - name: Get Android Package Name
-      id: get_package_name
+    - name: Install gdrive
       run: |
-        sudo aapt dump badging build/app/outputs/flutter-apk/*.apk > package_info.txt
-        package_name=$(sed -nE "s/^package: name='([^']+)'.*/\1/p" package_info.txt)
-        echo "PACKAGE_NAME=$package_name" >> $GITHUB_ENV
-        echo "Package Name -> $package_name"
+        # Download Google Drive client
+        wget -O gdrive https://github.com/glotlabs/gdrive/releases/download/3.9.0/gdrive_linux-x64.tar.gz
+        # Extract the contents
+        tar -xzf gdrive_linux-x64.tar.gz
+        chmod +x gdrive
+        sudo mv gdrive /usr/local/bin/
       shell: bash
-    - uses: actions/upload-artifact@v3
-      with:
-        name: "android-apk-${{ github.sha }}"
-        path: "build/app/outputs/flutter-apk/*.apk"
+    - name: Upload file to Google Drive
+      env:
+        GDRIVE_SA_KEY: ${{ inputs.gdrive-sa-key }}
+        GDRIVE_FOLDER_ID: ${{ env.GDRIVE_FOLDER_ID }}
+      run: |
+        # Upload the file and capture the output containing the file ID
+        upload_output=$(gdrive upload --service-account ${{ env.GDRIVE_SA_KEY }}.json --parent ${{ env.GDRIVE_FOLDER_ID }} build/app/outputs/flutter-apk/*.apk)
+
+        # Extract the file ID from the output using text manipulation (assuming the file ID is in the output)
+        file_id=$(echo "$upload_output" | awk '/File uploaded/ {print $2}')
+        echo "FILE_ID=$run_id" >> $GITHUB_ENV
+        echo "File id: $FILE_ID"
+      shell: bash
+    # - uses: actions/upload-artifact@v3
+    #   with:
+    #     name: "android-apk-${{ github.sha }}"
+    #     path: "build/app/outputs/flutter-apk/*.apk"
     - name: Get Artifact URL
       id: get-artifact-url
       env:
@@ -73,7 +118,7 @@ runs:
     - name: Check if Event is a Pull Request
       if: github.event_name != 'pull_request'
       run: |
-        echo "Workflow not triggered by a Pull Request. Exiting..."
+        echo "Workflow not triggered by a Pull Request. Skipping posting of PR comment."
         exit 0  # Exit the workflow if it's not a pull request event
       shell: bash
     - name: Get PR Details
@@ -100,8 +145,7 @@ runs:
       shell: bash
     - uses: thollander/actions-comment-pull-request@v2
       env:
-        RUNS_PATH: "${{ github.server_url }}/${{ github.repository }}/actions/\
-          runs/${{ env.RUN_ID }}"
+        RUNS_PATH: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ env.RUN_ID }}"
         ARTIFACT_URL: "https://api.github.com/repos/${{ github.repository_owner }}/${{ github.event.repository.name }}/actions/runs/${{ env.RUN_ID }}"
         PR_LINK: "[#${{ env.PR_NUMBER }} ${{ env.PR_TITLE }}](${{ env.PR_URL }})"
       with:
@@ -122,7 +166,3 @@ runs:
           | Emulator | http://localhost:3000/?url=${{ env.ARTIFACT_URL }}&pkg=${{ env.PACKAGE_NAME }} |
 
           [badge]: https://img.shields.io/badge/Build-Success!-3fb950?logo=github&style=for-the-badge
-
-    - id: generate-emulator-link
-      run: echo "EMULATOR_LINK=https://example.com" >> $GITHUB_OUTPUT
-      shell: bash
