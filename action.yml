@@ -6,6 +6,19 @@ inputs:
     description: "Which build platform to use. Options are: 'flutter'"
     required: true
     default: 'flutter'
+  storage-type:
+    description: "Which storage type to use - 'aws-s3', 'google-drive' or 'github-artifact'"
+    required: false
+    default: 'aws-s3'
+  aws-access-key-id:
+    description: "AWS Access Key ID"
+  aws-secret-access-key:
+    description: "AWS Secret Access Key"
+  aws-region:
+    description: "AWS Region"
+    default: 'ap-northeast-1'
+  aws-bucket:
+    description: AWS Bucket
   gdrive-sa-key:
     description: "Google Drive Service Account Key"
     required: true
@@ -19,7 +32,7 @@ outputs:
 runs:
   using: composite
   steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     # - uses: actions/setup-java@v2
     #   with:
     #     distribution: 'zulu'
@@ -54,66 +67,62 @@ runs:
     #     mkdir -p "$apk_directory"
     #     date +%s > "$apk_directory"
 
-    #   shell: bash
-    # - name: Mirror Directory Structure
-    #   uses: adityak74/google-drive-upload-git-action@main
-    #   with:
-    #     credentials: ${{ secrets.GDRIVE_SA_KEY }}
-    #     filename: "build/app/outputs/flutter-apk/*.apk"
-    #     folderId: ${{ secrets.GDRIVE_FOLDER_ID }}
-    #     overwrite: "true"
-    #     mirrorDirectoryStructure: "true"
+      # shell: bash
+    - run: echo "${{ github.action_path }}" >> $GITHUB_PATH
+      shell: bash
     - name: Set up environment variables
       run: .envsetup.sh
       shell: bash
-    - name: Install gdrive
+    - if: ${{ inputs.gdrive-sa-key }} == "github-artifact"
+      uses: actions/upload-artifact@v3
+      with:
+        name: "android-apk-${{ env.GITHUB_RUN_ID }}-${{ github.sha }}"
+        path: "build/app/outputs/flutter-apk/*.apk"
+    # - name: Get Artifact URL
+    #   id: get-artifact-url
+    #   env:
+    #     GH_TOKEN: ${{ github.token }}
+    #   run: |
+    #     run_id=$(echo "$GITHUB_RUN_ID")
+    #     repo_owner=$(echo "$GITHUB_REPOSITORY" | cut -d '/' -f1)
+    #     repo_name=$(echo "$GITHUB_REPOSITORY" | cut -d '/' -f2)
+
+    #     # Use GitHub API to get artifact information
+    #     artifact_info=$(gh api "/repos/$repo_owner/$repo_name/actions/runs/$run_id/artifacts")
+
+    #     # Extract the URL or download URL for your specific artifact
+    #     # ... process $artifact_info to retrieve the artifact URL or download URL
+
+    #     # Set the artifact URL as an output
+    #     # echo "::set-output name=artifact-url::$artifact_url"
+    #     echo "Run ID: $run_id"
+    #     echo "RUN_ID=$run_id" >> $GITHUB_ENV
+    #     echo "repo_owner: $repo_owner"
+    #     echo "repo_name: $repo_name"
+    #     echo "Artifact info: $artifact_info"
+    #   shell: bash
+    - if: ${{ inputs.gdrive-sa-key }} == "aws-s3"
+      name: Upload build file to S3 Bucket
+      uses: hkusu/s3-upload-action@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: 'ap-northeast-1'
+        aws-bucket: ${{ secrets.AWS_BUCKET }}
+        file-path: '*ME.md'
+
+    - if: ${{ inputs.gdrive-sa-key }} == "google-drive"
+      name: Upload build file to Google Drive
+      id: google-drive-upload
+      uses: wcyn/quill-container-action@main
+      with:
+        build-platform: world
+        gdrive-sa-key: "${{ inputs.gdrive-sa-key }}"
+
+    # Put an example of using your outputs here
+    - name: Check outputs
       run: |
-        # Download Google Drive client
-        wget -O gdrive https://github.com/glotlabs/gdrive/releases/download/3.9.0/gdrive_linux-x64.tar.gz
-        # Extract the contents
-        tar -xzf gdrive_linux-x64.tar.gz
-        chmod +x gdrive
-        sudo mv gdrive /usr/local/bin/
-      shell: bash
-    - name: Upload file to Google Drive
-      env:
-        GDRIVE_SA_KEY: ${{ inputs.gdrive-sa-key }}
-        GDRIVE_FOLDER_ID: ${{ env.GDRIVE_FOLDER_ID }}
-      run: |
-        # Upload the file and capture the output containing the file ID
-        upload_output=$(gdrive upload --service-account ${{ env.GDRIVE_SA_KEY }}.json --parent ${{ env.GDRIVE_FOLDER_ID }} build/app/outputs/flutter-apk/*.apk)
-
-        # Extract the file ID from the output using text manipulation (assuming the file ID is in the output)
-        file_id=$(echo "$upload_output" | awk '/File uploaded/ {print $2}')
-        echo "FILE_ID=$run_id" >> $GITHUB_ENV
-        echo "File id: $FILE_ID"
-      shell: bash
-    # - uses: actions/upload-artifact@v3
-    #   with:
-    #     name: "android-apk-${{ github.sha }}"
-    #     path: "build/app/outputs/flutter-apk/*.apk"
-    - name: Get Artifact URL
-      id: get-artifact-url
-      env:
-        GH_TOKEN: ${{ github.token }}
-      run: |
-        run_id=$(echo "$GITHUB_RUN_ID")
-        repo_owner=$(echo "$GITHUB_REPOSITORY" | cut -d '/' -f1)
-        repo_name=$(echo "$GITHUB_REPOSITORY" | cut -d '/' -f2)
-
-        # Use GitHub API to get artifact information
-        artifact_info=$(gh api "/repos/$repo_owner/$repo_name/actions/runs/$run_id/artifacts")
-
-        # Extract the URL or download URL for your specific artifact
-        # ... process $artifact_info to retrieve the artifact URL or download URL
-
-        # Set the artifact URL as an output
-        # echo "::set-output name=artifact-url::$artifact_url"
-        echo "Run ID: $run_id"
-        echo "RUN_ID=$run_id" >> $GITHUB_ENV
-        echo "repo_owner: $repo_owner"
-        echo "repo_name: $repo_name"
-        echo "Artifact info: $artifact_info"
+        echo "Outputs - ${{ steps.google-drive-upload.outputs.myOutput }}"
       shell: bash
     - name: Check if Event is a Pull Request
       if: github.event_name != 'pull_request'
