@@ -33,51 +33,43 @@ runs:
   using: composite
   steps:
     - uses: actions/checkout@v4
-    # - uses: actions/setup-java@v2
-    #   with:
-    #     distribution: 'zulu'
-    #     java-version: '11'
-    # - name: Build android flutter application
-    #   uses: subosito/flutter-action@v2
-    #   with:
-    #     cache: true
-    #     cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
-    #     cache-path: "${{ runner.tool_cache }}/flutter/:channel:-:version:-:arch:"
+    - uses: actions/setup-java@v2
+      with:
+        distribution: 'zulu'
+        java-version: '11'
+    - name: Build android flutter application
+      uses: subosito/flutter-action@v2
+      with:
+        cache: true
+        cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
+        cache-path: "${{ runner.tool_cache }}/flutter/:channel:-:version:-:arch:"
     # - run: flutter analyze
     # - run: flutter test
-    # - run: flutter build apk --release
-    #   shell: bash
-    # - run: sudo apt-get update
-    #   shell: bash
-    # - run: sudo apt-get -y install aapt
-    #   shell: bash
-    # - name: Get Android Package Name
-    #   id: get_package_name
-    #   run: |
-    #     sudo aapt dump badging build/app/outputs/flutter-apk/*.apk > package_info.txt
-    #     package_name=$(sed -nE "s/^package: name='([^']+)'.*/\1/p" package_info.txt)
-    #     echo "PACKAGE_NAME=$package_name" >> $GITHUB_ENV
-    #     echo "Package Name -> $package_name"
-    #   shell: bash
-    # - name: Make Directory Structure
-    #   run: |
-    #     apk_directory="{{ github.repository_owner }}/${{ github.event.repository.name }}/runs/${{ env.RUN_ID }}"
+    - run: flutter build apk --release
+      shell: bash
+    - run: sudo apt-get update
+      shell: bash
+    - run: sudo apt-get -y install aapt
+      shell: bash
+    - name: Get Android Package Name
+      id: get_package_name
+      run: |
+        sudo aapt dump badging build/app/outputs/flutter-apk/*.apk > package_info.txt
+        package_name=$(sed -nE "s/^package: name='([^']+)'.*/\1/p" package_info.txt)
+        echo "PACKAGE_NAME=$package_name" >> $GITHUB_ENV
+        echo "Package Name -> $package_name"
+      shell: bash
 
-    #     echo "APK_DIRECTORY="$apk_directory" >> $GITHUB_ENV
-    #     mkdir -p "$apk_directory"
-    #     date +%s > "$apk_directory"
-
-      # shell: bash
     - run: echo "${{ github.action_path }}" >> $GITHUB_PATH
       shell: bash
     - name: Set up environment variables
       run: .envsetup.sh
       shell: bash
-    - if: ${{ inputs.gdrive-sa-key }} == "github-artifact"
-      uses: actions/upload-artifact@v3
-      with:
-        name: "android-apk-${{ env.GITHUB_RUN_ID }}-${{ github.sha }}"
-        path: "build/app/outputs/flutter-apk/*.apk"
+
+    # - uses: actions/upload-artifact@v3
+    #   with:
+    #     name: "android-apk-${{ env.GITHUB_RUN_ID }}-${{ github.sha }}"
+    #     path: "build/app/outputs/flutter-apk/*.apk"
     # - name: Get Artifact URL
     #   id: get-artifact-url
     #   env:
@@ -101,28 +93,32 @@ runs:
     #     echo "repo_name: $repo_name"
     #     echo "Artifact info: $artifact_info"
     #   shell: bash
-    - if: ${{ inputs.gdrive-sa-key }} == "aws-s3"
-      name: Upload build file to S3 Bucket
-      uses: hkusu/s3-upload-action@v2
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: 'ap-northeast-1'
-        aws-bucket: ${{ secrets.AWS_BUCKET }}
-        file-path: '*ME.md'
+    # - if: ${{ inputs.gdrive-sa-key }} == "aws-s3"
+    #   name: Upload build file to S3 Bucket
+    #   uses: hkusu/s3-upload-action@v2
+    #   with:
+    #     aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+    #     aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    #     aws-region: 'ap-northeast-1'
+    #     aws-bucket: ${{ secrets.AWS_BUCKET }}
+    #     file-path: '*ME.md'
 
-    - if: ${{ inputs.gdrive-sa-key }} == "google-drive"
-      name: Upload build file to Google Drive
+    - name: Upload build file to Google Drive
       id: google-drive-upload
-      uses: wcyn/quill-container-action@main
+      uses: wcyn/google-drive-path-upload-action@main
       with:
-        build-platform: world
-        gdrive-sa-key: "${{ inputs.gdrive-sa-key }}"
-
+        gdrive_sa_key: "${{ inputs.gdrive-sa-key }}"
+        item_path: "build/app/outputs/flutter-apk/app-release.apk"
+        gdrive_folder_id: "${{ env.GDRIVE_FOLDER_ID }}"
+        name: "${{ github.repository_owner }}_${{ github.event.repository.name }}_${{ github.run_id }}_${{ github.sha }}.apk"
     # Put an example of using your outputs here
-    - name: Check outputs
+    - name: Get new google drive item download link
       run: |
-        echo "Outputs - ${{ steps.google-drive-upload.outputs.myOutput }}"
+        echo "GDRIVE Upload Output Id - ${{ steps.google-drive-upload.outputs }}"
+        echo "Outputs: $GITHUB_OUTPUTS"
+        echo "GDRIVE Upload Output Id - ${{ steps.google-drive-upload.outputs.uploaded_item_id }}"
+        echo "GDRIVE Upload Output Link - ${{ steps.google-drive-upload.outputs.download_link }}"
+        echo "PACKAGE_DOWNLOAD_LINK=${{ steps.google-drive-upload.outputs.download_link }}" >> $GITHUB_ENV
       shell: bash
     - name: Check if Event is a Pull Request
       if: github.event_name != 'pull_request'
@@ -172,6 +168,6 @@ runs:
           |--------------|------|
           | Pull Request | ${{ env.PR_LINK }} |
           | Artifacts and Logs | ${{ env.RUNS_PATH }} |
-          | Emulator | http://localhost:3000/?url=${{ env.ARTIFACT_URL }}&pkg=${{ env.PACKAGE_NAME }} |
+          | Emulator | http://localhost:3000/?url=${{ env.PACKAGE_DOWNLOAD_LINK }}&pkg=${{ env.PACKAGE_NAME }} |
 
           [badge]: https://img.shields.io/badge/Build-Success!-3fb950?logo=github&style=for-the-badge
