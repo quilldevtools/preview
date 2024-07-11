@@ -1,173 +1,51 @@
-name: 'Quill Flutter Action'
-description: 'Build mobile flutter apps and view them on an emulator'
+name: 'Preview'
+description: 'PR previews for your mobile app'
 # Define your inputs here.
 inputs:
-  build-command:
-    description: Optional build command to run instead of the default `flutter build apk --release`
-    required: false
-    default: "build apk --release"
-  test-command:
-    description: Optional test command to run instead of the default `flutter test`. Set to empty string to skip
-    required: false
-    default: "test"
-  analyze-command:
-    description: Optional analyze command to run instead of the default `flutter analyze`. Set to empty string to skip
-    required: false
-    default: "analyze"
-  storage-type:
-    description: "Which storage type to use - 'aws-s3', 'google-drive' or 'github-artifact'"
-    required: false
-    default: "google-drive"
-  gdrive-sa-key:
-    description: "Google Drive Service Account Key"
-    required: false
-  aws-access-key-id:
-    description: "AWS Access Key ID"
-  aws-secret-access-key:
-    description: "AWS Secret Access Key"
-  aws-region:
-    description: "AWS Region"
-    default: "ap-northeast-1"
-  aws-bucket:
-    description: AWS Bucket
+  app-path:
+    description: "path to the build .apk or .aab file"
+    required: true
 
-# Define your outputs here.
-outputs:
-  emulator-link:
-    description: 'A link to an emulator that will run the built mobile app'
-    value: ${{ steps.generate-emulator-link.outputs.emulator-link }}
+  pkg-name:
+    description: "the app's package id ie com.example.app"
+    required: true
 
+  api-key:
+    description: "your workspace api key found in your workspace settings"
+    required: true
 runs:
   using: composite
   steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-java@v2
+    - uses: actions/github-script@v7
+      id: get_pr_data
       with:
-        distribution: 'zulu'
-        java-version: '11'
-    - name: Build android flutter application
-      uses: subosito/flutter-action@v2
+        script: |
+          return (
+            await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              commit_sha: context.sha,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            })
+          ).data[0];
+    - name: "Quill upload"
+      id: quill_upload
+      shell: bash
+      run: |
+        gitHost=github
+        owner=${{ github.repository_owner }}
+        repoName=${{ github.event.repository.name }}
+        prId=${{ fromJson(steps.get_pr_data.outputs.result).number}}
+
+        echo $gitHost
+        echo $owner
+        echo $repoName
+        echo $prId
+
+        resp=$(curl -F "apk=@${{ inputs.app-path }}" "https://app.getquill.dev/preview?api_key=${{ inputs.api-key }}" -F gitHost=$gitHost -F owner=$owner -F repoName=$repoName -F prId=$prId -F pkg=${{ inputs.pkg-name }})
+
+        echo $resp
+        echo "resp=$resp" >> $GITHUB_OUTPUT
+    - uses: mshick/add-pr-comment@v2
       with:
-        cache: true
-        cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
-        cache-path: "${{ runner.tool_cache }}/flutter/:channel:-:version:-:arch:"
-    - run: flutter ${{ inputs.analyze-command }}
-      shell: bash
-    - run: flutter ${{ inputs.test-command }}
-      shell: bash
-    - run: flutter ${{ inputs.build-command }}
-      shell: bash
-    - name: Get APK path
-      id: get-apk-path
-      run: |
-        flutter_apk_output_file=$(ls -d build/app/outputs/flutter-apk/*.apk | tail -n1)
-        echo "FLUTTER_APK_OUTPUT_FILE=$flutter_apk_output_file" >> $GITHUB_ENV
-      shell: bash
-    - name: Get Android Package Name
-      id: get_package_name
-      run: |
-        sdk_path=$(ls -d $ANDROID_HOME/build-tools/** | tail -n1)
-        aapt_path="$sdk_path/aapt"
-        sudo $aapt_path dump badging $FLUTTER_APK_OUTPUT_FILE > package_info.txt
-        package_name=$(sed -nE "s/^package: name='([^']+)'.*/\1/p" package_info.txt)
-        echo "PACKAGE_NAME=$package_name" >> $GITHUB_ENV
-        echo "Package Name -> $package_name"
-      shell: bash
-    - run: echo "${{ github.action_path }}" >> $GITHUB_PATH
-      shell: bash
-    - name: Set up environment variables
-      run: .envsetup.sh
-      shell: bash
-
-    # - uses: actions/upload-artifact@v3
-    #   with:
-    #     name: "android-apk-${{ env.GITHUB_RUN_ID }}-${{ github.sha }}"
-    #     path: ${{ env.FLUTTER_APK_OUTPUT_FILE }}
-    # - name: Get Artifact URL
-    #   id: get-artifact-url
-    #   env:
-    #     GH_TOKEN: ${{ github.token }}
-    #   run: |
-    #     run_id=$(echo "$GITHUB_RUN_ID")
-    #     repo_owner=$(echo "$GITHUB_REPOSITORY" | cut -d '/' -f1)
-    #     repo_name=$(echo "$GITHUB_REPOSITORY" | cut -d '/' -f2)
-
-    #     # Use GitHub API to get artifact information
-    #     artifact_info=$(gh api "/repos/$repo_owner/$repo_name/actions/runs/$run_id/artifacts")
-
-    #     # Extract the URL or download URL for your specific artifact
-    #     # ... process $artifact_info to retrieve the artifact URL or download URL
-
-    #     # Set the artifact URL as an output
-    #     # echo "::set-output name=artifact-url::$artifact_url"
-    #     echo "Run ID: $run_id"
-    #     echo "RUN_ID=$run_id" >> $GITHUB_ENV
-    #     echo "repo_owner: $repo_owner"
-    #     echo "repo_name: $repo_name"
-    #     echo "Artifact info: $artifact_info"
-    #   shell: bash
-    # - if: ${{ inputs.gdrive-sa-key }} == "aws-s3"
-    #   name: Upload build file to S3 Bucket
-    #   uses: hkusu/s3-upload-action@v2
-    #   with:
-    #     aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-    #     aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-    #     aws-region: 'ap-northeast-1'
-    #     aws-bucket: ${{ secrets.AWS_BUCKET }}
-    #     file-path: '*ME.md'
-
-    - name: Upload build file to Google Drive
-      id: google-drive-upload
-      uses: wcyn/google-drive-path-upload-action@main
-      with:
-        gdrive_sa_key: "${{ inputs.gdrive-sa-key }}"
-        item_path: "${{ env.FLUTTER_APK_OUTPUT_FILE }}"
-        gdrive_folder_id: "${{ env.GDRIVE_FOLDER_ID }}"
-        name: "${{ github.repository_owner }}_${{ github.event.repository.name }}_${{ github.run_id }}_${{ github.sha }}.apk"
-    - name: Get new google drive item download link
-      run: |
-        echo "GDRIVE Upload Output Id - ${{ steps.google-drive-upload.outputs }}"
-        echo "Outputs: $GITHUB_OUTPUTS"
-        echo "GDRIVE Upload Output Id - ${{ steps.google-drive-upload.outputs.uploaded_item_id }}"
-        echo "GDRIVE Upload Output Link - ${{ steps.google-drive-upload.outputs.download_link }}"
-        echo "PACKAGE_DOWNLOAD_LINK=${{ steps.google-drive-upload.outputs.download_link }}" >> $GITHUB_ENV
-      shell: bash
-    - name: Check if event is a Pull Request
-      if: github.event_name != 'pull_request'
-      run: |
-        echo "Workflow not triggered by a Pull Request. Skipping posting of PR comment."
-      shell: bash
-    - name: Customize storage message
-      run: |
-        storage_message=""
-        if [ ${{ inputs.storage-type }} == 'github-artifact' ]; then
-          storage_message="Please note that uploaded artifacts only stay for around 90 days."
-        fi
-        echo "STORAGE_MESSAGE=$storage_message" >> $GITHUB_ENV
-
-      shell: bash
-    - name: Generate Emulator Link
-      id: generate-emulator-link
-      run: echo "emulator-link=http://localhost:3000/?url=${{ env.PACKAGE_DOWNLOAD_LINK }}&pkg=${{ env.PACKAGE_NAME }}" >> $GITHUB_OUTPUT
-      shell: bash
-    - uses: thollander/actions-comment-pull-request@v2
-      if: github.event_name == 'pull_request'
-      env:
-        RUNS_PATH: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-        ARTIFACT_URL: "https://api.github.com/repos/${{ github.event.repository.name }}/actions/runs/${{ github.run_id }}"
-        PR_LINK: "[#${{ github.event.pull_request.number }} ${{ github.event.pull_request.title }}](${{ github.event.pull_request.html_url }})"
-      with:
-        # https://docs.github.com/en/rest/actions/artifacts?apiVersion=2022-11-28
-        message: |-
-          ## Quill Build
-
-          Here is a link to the emulator to view your mobile application.
-
-          ${{ env.STORAGE_MESSAGE }}
-
-          | Name         | Link |
-          |--------------|------|
-          | Pull Request | ${{ env.PR_LINK }} |
-          | Logs | ${{ env.RUNS_PATH }} |
-          | Emulator | ${{ steps.generate-emulator-link.outputs.emulator-link }} |
-
+        message: |
+          [QA Review On Quill](${{ fromJson(steps.quill_upload.outputs.resp).previewUrl }})
