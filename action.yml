@@ -31,7 +31,7 @@ runs:
       id: quill_upload
       shell: bash
       run: |
-        resp=$(curl "https://app.getquill.dev/preview?api_key=${{ inputs.api-key }}" -F "apk=@${{ inputs.app-path }}" -F gitHost=github -F owner=${{ github.repository_owner }} -F repoName=${{ github.event.repository.name }} -F prId=${{ fromJson(steps.get_pr_data.outputs.result).number}} -F pkg=${{ inputs.pkg-name }})
+        resp=$(curl "https://api.getquill.dev/preview?api_key=${{ inputs.api-key }}" -F "apk=@${{ inputs.app-path }}" -F gitHost=github -F owner=${{ github.repository_owner }} -F repoName=${{ github.event.repository.name }} -F prId=${{ fromJson(steps.get_pr_data.outputs.result).number}} -F pkg=${{ inputs.pkg-name }})
 
         echo $resp
         echo "resp=$resp" >> $GITHUB_OUTPUT
