@@ -40,7 +40,6 @@ runs:
 
         resp=$(curl -F "apk=@${{ inputs.app-path }}" "https://api.getquill.dev/preview?api_key=${{ inputs.api-key }}" -F gitHost=$gitHost -F owner=$owner -F repoName=$repoName -F prId=$prId -F author=$author -F title=$title -F pkg=${{ inputs.pkg-name }})
 
-        echo $resp
         echo "resp=$resp" >> $GITHUB_OUTPUT
     - uses: mshick/add-pr-comment@v2
       with:
