@@ -39,5 +39,13 @@ runs:
         echo "resp=$resp" >> $GITHUB_OUTPUT
     - uses: mshick/add-pr-comment@v2
       with:
-        message: |
-          [QA Review On Quill](${{ fromJson(steps.quill_upload.outputs.resp).previewUrl }})
+        message: |-
+          ## Quill Preview
+
+          [![badge]](${{ env.RUNS_PATH }})
+
+          Here is a link to view your mobile application.
+          
+          [Mobile app Preview On Quill](${{ fromJson(steps.quill_upload.outputs.resp).previewUrl }})
+
+          [badge]: https://img.shields.io/badge/Build-Success!-3fb950?logo=github&style=for-the-badge
