@@ -28,7 +28,8 @@ runs:
             })
           );
           
-          console.log("Pull Request Data: ", prData); // This will print prData to the action logs
+          # console.log("Pull Request Data: ", prData); // This will print prData to the action logs
+          
           return prData;
     - name: "Quill upload"
       id: quill_upload
@@ -38,14 +39,21 @@ runs:
         owner=${{ github.repository_owner }}
         repoName=${{ github.event.repository.name }}
         prData=$(fromJson(steps.get_pr_data.outputs.result))
-        echo "PR Data: ${{ steps.get_pr_data.outputs.result }}"
+        echo "PR Data: ${{github.event.pull_request.number}}"
         if [ -z "$prData" ]; then
           echo "Error: Could not retrieve pull request data."
           exit 1
         fi
-        prId=${{ fromJson(steps.get_pr_data.outputs.result).number}}
-        author=${{ fromJson(steps.get_pr_data.outputs.result).user.login }}
-        title=${{ fromJson(steps.get_pr_data.outputs.result).title }}
+        # prId=${{ fromJson(steps.get_pr_data.outputs.result).number}}
+        # author=${{ fromJson(steps.get_pr_data.outputs.result).user.login }}
+        # title=${{ fromJson(steps.get_pr_data.outputs.result).title }}
+        prId=${{github.event.pull_request.number}}
+        author=${{ github.event.pull_request.user.login }}
+        title=${{ github.event.pull_request.title }}
+
+        echo $title
+        echo $prId
+        echo $author
 
         resp=$(curl -F "apk=@${{ inputs.app-path }}" "https://api.getquill.dev/preview?api_key=${{ inputs.api-key }}" -F gitHost=$gitHost -F owner=$owner -F repoName=$repoName -F prId=$prId -F author=$author -F title=$title -F pkg=${{ inputs.pkg-name }})
 
