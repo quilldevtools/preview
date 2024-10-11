@@ -26,7 +26,7 @@ runs:
               owner: context.repo.owner,
               repo: context.repo.repo,
             })
-          ).data[0];
+          );
           
           console.log("Pull Request Data: ", prData); // This will print prData to the action logs
           return prData;
