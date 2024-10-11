@@ -30,9 +30,9 @@ runs:
           exit 1
         fi
         
-        prId=$prData.number
-        author=$prData.user.login
-        title=$prData.title 
+        prId=${{prData.number}}
+        author=${{prData.user.login}}
+        title=${{prData.title}} 
 
         echo $title
         echo $prId
