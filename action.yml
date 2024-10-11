@@ -34,6 +34,12 @@ runs:
         gitHost=github
         owner=${{ github.repository_owner }}
         repoName=${{ github.event.repository.name }}
+        prData=$(fromJson(steps.get_pr_data.outputs.result))
+        echo "PR Data: ${{ steps.get_pr_data.outputs.result }}"
+        if [ -z "$prData" ]; then
+          echo "Error: Could not retrieve pull request data."
+          exit 1
+        fi
         prId=${{ fromJson(steps.get_pr_data.outputs.result).number}}
         author=${{ fromJson(steps.get_pr_data.outputs.result).user.login }}
         title=${{ fromJson(steps.get_pr_data.outputs.result).title }}
