@@ -28,7 +28,7 @@ runs:
             })
           );
           
-          # console.log("Pull Request Data: ", prData); // This will print prData to the action logs
+          console.log("Pull Request Data: ", prData); // This will print prData to the action logs
           
           return prData;
     - name: "Quill upload"
