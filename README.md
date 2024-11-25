@@ -26,6 +26,16 @@ See [action.yml](action.yml)
 | ----------------- | ------------------------------------------------ |
 | `mobile_app_link` | A link to an emulator that will run the built mobile app |
 
+### Sample step
+
+```
+  - uses: quilldevtools/preview@main
+    with:
+      app-path: "build/app/outputs/flutter-apk/app-release.apk"
+      pkg-name: "com.example" # REPLACE THIS WITH THE NAME OF YOUR APP PACKAGE
+      api-key: ${{secrets.QUILL_API_KEY}}
+```
+
 ### Sample workflow for a Flutter app
 
 1. Create a workflow file `quill.yml` in your repo's `.github/workflows` directory.
