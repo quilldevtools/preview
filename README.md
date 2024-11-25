@@ -1,19 +1,36 @@
-# Quill Flutter Action
+# Quill Preview Action
 
-This action builds your flutter mobile application and installs it on a web based emulator allowing you to view your
-changes as soon as they are commited.
-
-See also [quill-android-gradle-action](https://github.com/quilldevtools/quill-android-gradle-action).
+This action uploads your built mobile app to our platform at https://app.getquill.dev, and gives you a convenient link
+to view your mobile app changes as soon as they are commited.
 
 # What's new
 
-- Support for apk uploads to Google Drive storage
-- Customizable flutter commands `test`, `analyze` and `build`
+- Provide only your API Key from the Quill workspace, as well as the path to your app and the app name
 
 # Usage
 
-To use the action, create a workflow file `quill.yml` in your repo's `.github/workflows` directory.
-Here's a basic set up that builds the android apk and uploads it to Google Drive.
+### Inputs
+
+See [action.yml](action.yml)
+
+| Name       | Description                                                              | Required |
+| ---------- | ------------------------------------------------------------------------ | -------- |
+| `app-path` | The path to the app you'd like to add to your Quill Workspace            | Yes      |
+| `pkg-name` | The name of your app package e.g. `com.example.myapp`                    | Yes      |
+| `api-key`  | API key for your Quill workspace which you can find on the settings page | Yes      |
+
+### Outputs
+
+See [action.yml](action.yml)
+| Name | Description |
+| ----------------- | ------------------------------------------------ |
+| `mobile_app_link` | A link to an emulator that will run the built mobile app |
+
+### Sample workflow for a Flutter app
+
+1. Create a workflow file `quill.yml` in your repo's `.github/workflows` directory.
+2. Here's a basic set up that builds an android apk for a flutter app gives you a preview link to view your app on our
+   emulator on the web.
 
 ```yaml
 # .github/workflows/quill.yml
@@ -29,6 +46,7 @@ on:
 permissions:
   pull-requests: write # Needed to add comments to the Pull Request that triggered the build
   actions: write # Needed to cancel a workflow when it no longer needs to run
+  contents: read # Needed so that GitHub can pull the code and build the app
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel.
 jobs:
@@ -38,52 +56,29 @@ jobs:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
     steps:
-      - uses: quilldevtools/quill-flutter-action@v1
+      - uses: actions/checkout@v2
+      - uses: actions/setup-java@v1
         with:
-          gdrive-sa-key: ${{ secrets.GDRIVE_SA_KEY }}
+          java-version: "11.0"
+      - uses: subosito/flutter-action@v1
+        with:
+          flutter-version: "3.19.2"
+
+      # Fetch Dependencies
+      - run: flutter pub get
+
+      # Builf Android App
+      - run: flutter build apk --release
+
+      # Create a preview on Quill
+      - uses: quilldevtools/preview@main
+        with:
+          app-path: "build/app/outputs/flutter-apk/app-release.apk"
+          pkg-name: "com.example" # REPLACE THIS WITH THE NAME OF YOUR APP PACKAGE
+          api-key: ${{secrets.QUILL_API_KEY}}
 ```
 
-In order to **upload the app to Google Drive**, you will need the **Google Service Account (GSA) key** that the Quill
-action uses. This will be provided to you. Follow these [steps to create secrets for a repository](https://docs.github.com/en/actions/security-guides/using-secrets-in-github-actions?tool=webui#creating-secrets-for-a-repository).
-
-### Customize flutter commands
-
-To customize flutter commands, use the respective inputs without the `flutter` keyword
-
-```yaml
-steps:
-    - uses: quilldevtools/quill-flutter-action@main
-    with:
-        test-command: "test"
-        analyze-command: "analyze"
-        build-command: "build apk --release"
-        gdrive-sa-key: ${{ secrets.GDRIVE_SA_KEY }}
-```
-
-### Inputs
-
-See [action.yml](action.yml)
-
-| Name              | Description                                                                                           | Required                                 |
-| ----------------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| `build-command`   | Flutter build command to run instead of the default `flutter build apk --release`                     | No                                       |
-| `test-command`    | Flutter test command to run instead of the default `flutter test`. Set to empty string to skip        | No                                       |
-| `analyze-command` | Flutter analyze command to run instead of the default `flutter analyze`. Set to empty string to skip  | No                                       |
-| `storage-type`    | Which storage type to use - 'aws-s3', 'google-drive' or 'github-artifact'. Default is 'google-drive'. | No                                       |
-| `gdrive-sa-key`   | The Google Drive Service Account Key needed to upload the mobile build file to Google Drive           | Yes, if `storage-type` is `google-drive` |
-
-### Outputs
-
-See [action.yml](action.yml)
-| Name | Description |
-| ----------------- | ------------------------------------------------ |
-| `emulator-link` | A link to an emulator that will run the built mobile app |
-
-### Retention Period
-
-If using GitHub Artifacts, note that these are retained for a maximum of 90 days. The other storage options do not have
-a retention limit and the APK files are kept perpetually unless deleted. For more information see
-[artifact and log retention policies](https://docs.github.com/en/free-pro-team@latest/actions/reference/usage-limits-billing-and-administration#artifact-and-log-retention-policy).
+In order to **add the app to your workspace on Quill**, you will need the **Quill API key** which you can find on the settings page of your Quill workspace. Follow these [steps to create secrets for a repository](https://docs.github.com/en/actions/security-guides/using-secrets-in-github-actions?tool=webui#creating-secrets-for-a-repository).
 
 ## Supported
 
@@ -109,11 +104,7 @@ on:
 ## Dependencies
 
 - Bash shell
-- [actions/checkout](https://github.com/actions/checkout)
-- [actions/setup-java](https://github.com/actions/setup-java)
-- [subosito/flutter-action](https://github.com/subosito/flutter-action)
-- [wcyn/google-drive-path-upload-action](https://github.com/wcyn/google-drive-path-upload-action)
-- [actions/cache](https://github.com/actions/cache)
+- [mshick/add-pr-comment](https://github.com/mshick/add-pr-comment)
 
 # License
 

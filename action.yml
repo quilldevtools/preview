@@ -13,6 +13,12 @@ inputs:
   api-key:
     description: "Your workspace api key found in your workspace settings"
     required: true
+
+outputs:
+  mobile_app_link:
+    description: 'A link to an emulator that will run the built mobile app'
+    value: ${{ fromJson(steps.quill_upload.outputs.resp).previewUrl }}
+
 runs:
   using: composite
   steps:
