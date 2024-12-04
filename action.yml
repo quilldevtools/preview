@@ -32,9 +32,6 @@ runs:
         prData=${{github.event.pull_request}}
         branch=${{ github.ref_name}}
 
-
-        echo "$branch"
-
         if [ -n "$prData" ]; then
           prId="${{github.event.pull_request.number}}"
           author="${{github.event.pull_request.user.login}}"
