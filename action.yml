@@ -40,16 +40,13 @@ runs:
           author="${{github.event.pull_request.user.login}}"
           title="${{github.event.pull_request.title}}"
         elif [ "$branch" = "main" ] || [ "$branch" = "master" ]; then
-          prId="main"
+          prId="0"
           author="$owner"
           title="Main Release"
         else
           echo "Error: Could not get preview details"
           exit 1
         fi
-
-        echo "$prId"
-        echo "$branch"
 
         resp=$(curl -F "apk=@${{ inputs.app-path }}" "https://api.getquill.dev/preview?api_key=${{ inputs.api-key }}" -F gitHost="$gitHost" -F owner="$owner" -F repoName="$repoName" -F prId="$prId" -F author="$author" -F title="$title" -F pkg="${{ inputs.pkg-name }}")
 
