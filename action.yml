@@ -40,9 +40,7 @@ runs:
         author="${{github.event.pull_request.user.login}}"
         title="${{github.event.pull_request.title}}" 
 
-        // Assume that action is running on main, if there is no prId
         branch=${{ github.head_ref}}
-
         if [ "$branch" = "main" ]; then 
           prId="main"
         fi
