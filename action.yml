@@ -43,7 +43,7 @@ runs:
         // Assume that action is running on main, if there is no prId
         branch=${{ github.head_ref}}
 
-        if ["$branch"="main"]; then 
+        if [ "$branch" = "main" ]; then 
           prId="main"
         fi
 
