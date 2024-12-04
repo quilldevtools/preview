@@ -30,7 +30,7 @@ runs:
         owner=${{ github.repository_owner }}
         repoName=${{ github.event.repository.name }}
         prData=${{github.event.pull_request}}
-        branch=${{ github.head_ref}}
+        branch=${{ github.ref_name}}
 
 
         echo "$branch"
@@ -39,7 +39,7 @@ runs:
           prId="${{github.event.pull_request.number}}"
           author="${{github.event.pull_request.user.login}}"
           title="${{github.event.pull_request.title}}"
-        elif [ "$branch" = "main" ]; then
+        elif [ "$branch" = "main" ] || [ "$branch" = "master" ]; then
           prId="main"
           author="$owner"
           title="Main Release"
