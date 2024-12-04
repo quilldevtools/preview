@@ -1,5 +1,5 @@
-name: 'Preview'
-description: 'PR previews for your mobile app'
+name: "Preview"
+description: "PR previews for your mobile app"
 # Define your inputs here.
 inputs:
   app-path:
@@ -16,7 +16,7 @@ inputs:
 
 outputs:
   mobile_app_link:
-    description: 'A link to an emulator that will run the built mobile app'
+    description: "A link to an emulator that will run the built mobile app"
     value: ${{ fromJson(steps.quill_upload.outputs.resp).previewUrl }}
 
 runs:
@@ -30,7 +30,7 @@ runs:
         owner=${{ github.repository_owner }}
         repoName=${{ github.event.repository.name }}
         prData=${{github.event.pull_request}}
-        
+
         if [ -z "$prData" ]; then
           echo "Error: Could not retrieve pull request data."
           exit 1
@@ -39,6 +39,16 @@ runs:
         prId="${{github.event.pull_request.number}}"
         author="${{github.event.pull_request.user.login}}"
         title="${{github.event.pull_request.title}}" 
+
+        // Assume that action is running on main, if there is no prId
+        branch=${{ github.head_ref}}
+
+        if ["$branch"="main"]; then 
+          prId="main"
+        fi
+
+        echo "$prId"
+        echo "$branch"
 
         resp=$(curl -F "apk=@${{ inputs.app-path }}" "https://api.getquill.dev/preview?api_key=${{ inputs.api-key }}" -F gitHost="$gitHost" -F owner="$owner" -F repoName="$repoName" -F prId="$prId" -F author="$author" -F title="$title" -F pkg="${{ inputs.pkg-name }}")
 
@@ -51,7 +61,7 @@ runs:
           [![badge]](${{ env.RUNS_PATH }})
 
           Here is a link to view your mobile application.
-          
+
           [Mobile app Preview On Quill](${{ fromJson(steps.quill_upload.outputs.resp).previewUrl }})
 
           [badge]: https://img.shields.io/badge/Build-Success!-3fb950?logo=github&style=for-the-badge
